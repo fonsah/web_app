@@ -1,15 +1,19 @@
-output "cluster_endpoint" {
-  value = aws_eks_cluster.eks_cluster.endpoint
+output "eks_cluster_id" {
+  description = "The ID of the EKS cluster"
+  value       = module.eks.cluster_id
 }
 
-output "cluster_security_group_id" {
-  value = aws_eks_cluster.eks_cluster.vpc_config[0].cluster_security_group_id
+output "eks_cluster_endpoint" {
+  description = "The endpoint for the EKS cluster"
+  value       = module.eks.cluster_endpoint
 }
 
-output "kubeconfig_command" {
-  value = "aws eks update-kubeconfig --name ${var.cluster_name} --region ${var.aws_region}"
+output "eks_cluster_certificate_authority" {
+  description = "The EKS cluster certificate authority data"
+  value       = module.eks.cluster_certificate_authority_data
 }
 
-output "worker_node_role" {
-  value = aws_iam_role.eks_worker_role.arn
+output "worker_node_group_arns" {
+  description = "ARNs of the worker node groups"
+  value       = module.eks.eks_managed_node_groups
 }
