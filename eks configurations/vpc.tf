@@ -1,41 +1,47 @@
-# Fetch available availability zones for the AWS region
-data "aws_availability_zones" "available" {}
-
-# Create a VPC
+# VPC Configuration
 resource "aws_vpc" "eks_vpc" {
-  cidr_block           = "10.0.0.0/16"
-  enable_dns_support   = true
+  cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
+  enable_dns_support   = true
 
   tags = {
-    Name = "eks-vpc"
+    Name = "eks-cluster-vpc"
   }
 }
 
-# Create Public Subnets
-resource "aws_subnet" "eks_public_subnet" {
+resource "aws_subnet" "public_subnet" {
   count                   = 2
   vpc_id                  = aws_vpc.eks_vpc.id
-  cidr_block              = "10.0.${count.index + 1}.0/24"
-  availability_zone       = data.aws_availability_zones.available.names[count.index]
+  cidr_block              = var.public_subnets[count.index]
+  availability_zone       = var.availability_zones[count.index]
   map_public_ip_on_launch = true
-
   tags = {
-    Name = "eks-public-subnet-${count.index + 1}"
+    Name = "public-subnet-${count.index}"
   }
 }
 
-# Create an Internet Gateway
+resource "aws_subnet" "private_subnet" {
+  count             = 2
+  vpc_id            = aws_vpc.eks_vpc.id
+  cidr_block        = var.private_subnets[count.index]
+  availability_zone = var.availability_zones[count.index]
+  tags = {
+    Name = "private-subnet-${count.index}"
+  }
+}
+
+
+# Internet Gateway Configuration
 resource "aws_internet_gateway" "eks_igw" {
   vpc_id = aws_vpc.eks_vpc.id
 
   tags = {
-    Name = "eks-igw"
+    Name = "eks-internet-gateway"
   }
 }
 
-# Create a Public Route Table
-resource "aws_route_table" "eks_public_route_table" {
+# Route Table for Public Subnets
+resource "aws_route_table" "public_route_table" {
   vpc_id = aws_vpc.eks_vpc.id
 
   tags = {
@@ -43,16 +49,60 @@ resource "aws_route_table" "eks_public_route_table" {
   }
 }
 
-# Add a Route to the Internet Gateway in the Public Route Table
-resource "aws_route" "eks_public_route" {
-  route_table_id         = aws_route_table.eks_public_route_table.id
+# Route to the Internet in Public Route Table
+resource "aws_route" "public_internet_route" {
+  route_table_id         = aws_route_table.public_route_table.id
   destination_cidr_block = "0.0.0.0/0"
   gateway_id             = aws_internet_gateway.eks_igw.id
 }
 
 # Associate Public Subnets with the Public Route Table
-resource "aws_route_table_association" "eks_public_route_table_association" {
-  count          = 2
-  subnet_id      = aws_subnet.eks_public_subnet[count.index].id
-  route_table_id = aws_route_table.eks_public_route_table.id
+resource "aws_route_table_association" "public_subnet_association" {
+  count          = length(var.public_subnets)
+  subnet_id      = aws_subnet.public_subnet[count.index].id
+  route_table_id = aws_route_table.public_route_table.id
 }
+
+
+# NAT Gateway for Private Subnets
+resource "aws_eip" "nat_eip" {
+  count = 1
+
+  tags = {
+    Name = "eks-nat-eip"
+  }
+}
+
+resource "aws_nat_gateway" "nat_gateway" {
+  allocation_id = aws_eip.nat_eip[0].id
+  subnet_id     = aws_subnet.public_subnet[0].id
+  depends_on    = [aws_internet_gateway.eks_igw]
+
+  tags = {
+    Name = "eks-nat-gateway"
+  }
+}
+
+# Route Table for Private Subnets
+resource "aws_route_table" "private_route_table" {
+  vpc_id = aws_vpc.eks_vpc.id
+
+  tags = {
+    Name = "eks-private-route-table"
+  }
+}
+
+# Route through NAT Gateway for Private Subnets
+resource "aws_route" "private_nat_route" {
+  route_table_id         = aws_route_table.private_route_table.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.nat_gateway.id
+}
+
+# Associate Private Subnets with the Private Route Table
+resource "aws_route_table_association" "private_subnet_association" {
+  count          = length(var.private_subnets)
+  subnet_id      = aws_subnet.private_subnet[count.index].id
+  route_table_id = aws_route_table.private_route_table.id
+}
+

@@ -77,18 +77,17 @@ resource "aws_eks_cluster" "eks_cluster" {
   role_arn = aws_iam_role.eks_cluster_role.arn
 
   vpc_config {
-    subnet_ids         = aws_subnet.eks_public_subnet[*].id # Corrected reference
-    security_group_ids = [aws_security_group.eks_sg.id]
-  }
-
-  kubernetes_network_config {
-    service_ipv4_cidr = "172.20.0.0/16"
+    subnet_ids = aws_subnet.public_subnet[*].id
+    security_group_ids = [
+      aws_security_group.eks_sg.id
+    ]
   }
 
   tags = {
     Name = var.cluster_name
   }
 }
+
 
 
 data "aws_ami" "eks_worker_ami" {
@@ -127,15 +126,23 @@ resource "aws_launch_template" "eks_worker_template" {
 }
 
 resource "aws_autoscaling_group" "eks_workers_asg" {
+  vpc_zone_identifier = aws_subnet.public_subnet[*].id
+
   launch_template {
     id      = aws_launch_template.eks_worker_template.id
     version = "$Latest"
   }
 
-  min_size            = 1
-  max_size            = 3
-  desired_capacity    = var.node_group_size
-  vpc_zone_identifier = aws_subnet.eks_public_subnet[*].id # Corrected subnet refere
+  min_size         = var.node_group_size
+  max_size         = var.node_group_size
+  desired_capacity = var.node_group_size
+
+  tag {
+    key                 = "kubernetes.io/cluster/${var.cluster_name}"
+    value               = "owned"
+    propagate_at_launch = true
+  }
 }
+
 
 
