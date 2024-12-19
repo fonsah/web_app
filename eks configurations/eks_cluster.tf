@@ -1,24 +1,41 @@
-module "eks" {
-  source          = "terraform-aws-modules/eks/aws"
-  version         = "19.18.0"
-  cluster_name    = "web-app-cluster"
-  cluster_version = "1.27"
+resource "aws_eks_cluster" "this" {
+  name            = "${var.project_name}-cluster"
+  role_arn        = aws_iam_role.eks_cluster_role.arn
+  version         = var.cluster_version
 
-  subnet_ids = concat(aws_subnet.public_subnets[*].id, aws_subnet.private_subnets[*].id)
-  vpc_id     = aws_vpc.eks_vpc.id
+  vpc_config {
+    subnet_ids = [for subnet in aws_subnet.private : subnet.id]
+    security_group_ids = [aws_security_group.cluster.id]
+  }
 
-  eks_managed_node_groups = {
-    eks_nodes = {
-      desired_capacity = 2
-      min_size         = 2
-      max_size         = 3
-      instance_types   = ["t3.medium"]
-      capacity_type    = "ON_DEMAND"
+  depends_on = [
+    aws_iam_role_policy_attachment.cluster_AmazonEKSClusterPolicy,
+    aws_iam_role_policy_attachment.cluster_AmazonEKSVPCResourceController
+  ]
 
-      tags = {
-        "kubernetes.io/cluster/web-app-cluster" = "owned"
-        "Name"                                 = "eks-worker-node"
-      }
-    }
+  tags = {
+    Project = var.project_name
+  }
+}
+
+resource "aws_eks_node_group" "default" {
+  cluster_name    = aws_eks_cluster.this.name
+  node_role_arn   = aws_iam_role.node_group_role.arn
+  subnet_ids      = [for subnet in aws_subnet.private : subnet.id]
+  scaling_config {
+    desired_size = var.desired_size
+    max_size     = var.max_size
+    min_size     = var.min_size
+  }
+  instance_types = var.instance_types
+  depends_on = [
+    aws_iam_role_policy_attachment.nodegroup_AmazonEKSWorkerNodePolicy,
+    aws_iam_role_policy_attachment.nodegroup_AmazonEKS_CNI_Policy,
+    aws_iam_role_policy_attachment.nodegroup_AmazonEC2ContainerRegistryReadOnly,
+    aws_eks_cluster.this
+  ]
+
+  tags = {
+    Project = var.project_name
   }
 }

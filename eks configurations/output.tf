@@ -1,19 +1,19 @@
-output "eks_cluster_id" {
-  description = "The ID of the EKS cluster"
-  value       = module.eks.cluster_id
+output "vpc_id" {
+  description = "VPC ID"
+  value       = aws_vpc.this.id
+}
+
+output "eks_cluster_name" {
+  description = "EKS Cluster Name"
+  value       = aws_eks_cluster.this.name
 }
 
 output "eks_cluster_endpoint" {
-  description = "The endpoint for the EKS cluster"
-  value       = module.eks.cluster_endpoint
+  description = "EKS Cluster Endpoint"
+  value       = aws_eks_cluster.this.endpoint
 }
 
-output "eks_cluster_certificate_authority" {
-  description = "The EKS cluster certificate authority data"
-  value       = module.eks.cluster_certificate_authority_data
-}
-
-output "worker_node_group_arns" {
-  description = "ARNs of the worker node groups"
-  value       = module.eks.eks_managed_node_groups
+output "node_group_role_arn" {
+  description = "ARN of the Node Group Role"
+  value       = aws_iam_role.node_group_role.arn
 }
