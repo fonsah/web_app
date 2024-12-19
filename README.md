@@ -121,7 +121,7 @@ Accessed the application using the ALB DNS name:
 curl http://<ALB-DNS-Name>
 
 Outcome:
-The application responded with "Hello, Kubernetes! This is my Flask app." ![image of final outcome](web_app/image/flask-app.png)
+The application responded with "Hello, Kubernetes! This is my Flask app." ![image of final outcome](image/flask-app.png)
 
 Challenges and Solutions
 
